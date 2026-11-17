@@ -20,7 +20,10 @@
 //   multiple(tvl) = clamp(exp(intercept + slope * ln(tvl)), 0.01, 3.0)   (fitted, see below)
 //   growth         = clamp(change_7d, -60, 120) per cent
 //   growthMult     = 1 + (growth / 100) * 0.5
-//   maturity       = 0.6 + min(age_days, 1095) / 1095 * 0.4   (age_days unknown: 365)
+//   maturity       = 0.6 + min(age_days, 1095) / 1095 * 0.4   (age_days unknown: 365 — an
+//                    imputation, not a fact: listed_at is the day DefiLlama began tracking the
+//                    protocol, "time tracked by DefiLlama; proxy only". It is not necessarily the
+//                    protocol's age, and not necessarily how long it has run with no token.)
 //   implied        = max(1, round(tvl_usd * multiple(tvl) * growthMult * maturity))
 //
 // The same formula in power-law form, before the clamp: implied = exp(intercept) x
@@ -36,7 +39,7 @@
 // both in whole US dollars, over the 94 launch-comparable live-token comps (see compsOf).
 // Zero and missing values never enter the fit: a comp needs mcap_usd > 0, tvl_usd > 0 and a
 // non-null category; change_7d null counts as 0% growth; listed_at null counts as 365 days of
-// age. The comps span $5.0M–$10.2B of TVL and the board's candidates $5.0M–$2.75B, so the fit
+// age — an imputation, not a fact (see the maturity line above). The comps span $5.0M–$10.2B of TVL and the board's candidates $5.0M–$2.75B, so the fit
 // interpolates across the candidates' range rather than extrapolating past it. Regressing
 // log(mcap / TVL) on log(TVL) is the same line as regressing log(mcap) on log(TVL) with the
 // slope shifted by -1: the slope is a description of how the ratio varies with size, not causal
@@ -155,9 +158,10 @@ export interface BoardRow {
   token_status: 'pre-token';
   age_days: number | null;
   implied_value_usd: number;
-  /** True when this row's category has fewer than 4 launch-comparable comps: no family-level
-   * validation exists for it, so its implied value carries wider uncertainty (see the dashboard). */
-  low_confidence: boolean;
+  /** True when this row's category has fewer than 4 launch-comparable comps: sparse category
+   * support, so its implied value carries wider uncertainty (see the dashboard). This is a
+   * count label, not a calibrated probability of being right. */
+  sparse_support: boolean;
   model: {
     multiple: number;
     growth_pct: number;
@@ -185,8 +189,8 @@ export interface RadarRow {
   growth_multiplier: number;
   maturity_multiplier: number;
   watchlist: boolean;
-  /** True when this row's category has fewer than 4 launch-comparable comps. */
-  low_confidence: boolean;
+  /** True when this row's category has fewer than 4 launch-comparable comps (sparse category support). */
+  sparse_support: boolean;
   /** Launch-comparable comps in this row's category (0 when the category has none). */
   category_comps: number;
 }
@@ -202,41 +206,67 @@ export interface LiveRow {
   change_7d: number | null;
 }
 
-/** One family's held-out results: the group size, and this model against radar-1 on that family alone. */
-export interface PerFamilyResult {
-  family: string;
-  /** How many held-out predictions this family contributes. */
+/** One category's held-out results: the group size, and this model against radar-1 on that category alone. */
+export interface PerCategoryResult {
+  category: string;
+  /** How many held-out predictions this category contributes. */
   n: number;
   median_log_error: number;
-  median_ape_pct: number;
-  mean_ape_pct: number;
+  /** Median symmetric multiplicative (factor) error, in per cent: |exp(|log error|) − 1| × 100. NOT a standard APE. */
+  median_factor_error_pct: number;
+  /** Mean factor error, in per cent. */
+  mean_factor_error_pct: number;
+  /** Median standard absolute percentage error, in per cent: |pred / actual − 1| × 100. */
+  median_std_ape_pct: number;
+  /** Mean standard absolute percentage error, in per cent. */
+  mean_std_ape_pct: number;
   radar1_median_log_error: number;
-  radar1_median_ape_pct: number;
-  radar1_mean_ape_pct: number;
+  radar1_median_factor_error_pct: number;
+  radar1_mean_factor_error_pct: number;
+  radar1_median_std_ape_pct: number;
+  radar1_mean_std_ape_pct: number;
 }
 
 /** One out-of-sample check, stated with the number the run itself measured. */
 export interface ValidationCheck {
-  /** What was held out: one protocol at a time, or one whole family (category) at a time. */
+  /** What was held out: one protocol at a time, or one whole category at a time. */
   held_out: string;
   /** How many predictions the median is over. */
   n: number;
   /** This model's median |log(pred / actual market cap)|, pooled over all held-out predictions. */
   median_log_error: number;
-  /** The same, as a median absolute percentage error (pooled). */
-  median_ape_pct: number;
-  /** The mean absolute percentage error (pooled): the average miss, not just the middle one. */
-  mean_ape_pct: number;
+  /** The typical multiplicative factor, pooled: the median of exp(|log error|) over the held-out
+   * predictions, computed directly — NOT exp(median |log error|), which differs for even samples
+   * because the median of a transformed list is not the transform of the median. A factor of 3.1
+   * means the typical prediction is about 3.1 times too big or too small. */
+  median_factor: number;
+  /** The same, as a median factor error in per cent (pooled): the median, over the held-out
+   * predictions, of (exp(|log error|) − 1) × 100. Note this is NOT (median_factor − 1) × 100:
+   * the median of the per-prediction factor errors differs from the factor error of the median. */
+  median_factor_error_pct: number;
+  /** The mean factor error (pooled): the average miss, not just the middle one. */
+  mean_factor_error_pct: number;
+  /** Median standard absolute percentage error (pooled): |pred / actual − 1| × 100. */
+  median_std_ape_pct: number;
+  /** Mean standard absolute percentage error (pooled). */
+  mean_std_ape_pct: number;
   /** radar-1 (flat 0.25) on the same held-out predictions, for comparison. */
   radar1_median_log_error: number;
-  radar1_median_ape_pct: number;
-  radar1_mean_ape_pct: number;
-  /** Macro-average: the mean of the per-family medians, so a big family cannot hide a small one. */
+  radar1_median_factor: number;
+  radar1_median_factor_error_pct: number;
+  radar1_mean_factor_error_pct: number;
+  radar1_median_std_ape_pct: number;
+  radar1_mean_std_ape_pct: number;
+  /** Macro-average: the mean of the per-category medians, so a big category cannot hide a small one. */
   macro_median_log_error: number;
-  /** Macro-average of the per-family mean APEs. */
-  macro_mean_ape_pct: number;
-  /** This model against radar-1, family by family. */
-  per_family: PerFamilyResult[];
+  /** Macro-average of the per-category mean factor errors. */
+  macro_mean_factor_error_pct: number;
+  /** Macro-average of the per-category median standard APEs. */
+  macro_median_std_ape_pct: number;
+  /** Macro-average of the per-category mean standard APEs. */
+  macro_mean_std_ape_pct: number;
+  /** This model against radar-1, category by category. */
+  per_category: PerCategoryResult[];
 }
 
 /** One ablation variant: the same held-out predictions, scored with fewer of the model's parts. */
@@ -244,11 +274,15 @@ export interface AblationVariant {
   /** flat-0.25 (radar-1) | size-only | size+growth | full (radar-2). */
   variant: string;
   loo_median_log_error: number;
-  loo_median_ape_pct: number;
-  loo_mean_ape_pct: number;
-  lofo_median_log_error: number;
-  lofo_median_ape_pct: number;
-  lofo_mean_ape_pct: number;
+  loo_median_factor_error_pct: number;
+  loo_mean_factor_error_pct: number;
+  loo_median_std_ape_pct: number;
+  loo_mean_std_ape_pct: number;
+  loco_median_log_error: number;
+  loco_median_factor_error_pct: number;
+  loco_mean_factor_error_pct: number;
+  loco_median_std_ape_pct: number;
+  loco_mean_std_ape_pct: number;
 }
 
 /** The fitted multiple and its own checks, as the run measured them. */
@@ -266,12 +300,27 @@ export interface ModelFit {
   /** TVL range of the board's candidates, in whole USD: the fit must cover it, not extrapolate past it. */
   candidates_tvl_min: number;
   candidates_tvl_max: number;
-  /** Launch-comparable comps per category, most first: the basis for low-confidence labels. */
+  /** Launch-comparable comps per category, most first: the basis for sparse-support labels. */
   comps_by_category: { category: string; n: number }[];
   leave_one_out: ValidationCheck;
-  leave_one_family_out: ValidationCheck;
+  leave_one_category_out: ValidationCheck;
   /** Baseline flat 0.25 / size-only / size+growth / full, each on the same held-out predictions. */
   ablation: AblationVariant[];
+  /** The versioned-comp sensitivity: the fit and its leave-one-out check with and without the
+   * comps whose names carry a version marker (see versionedSensitivity). */
+  versioned_comp_sensitivity: VersionedCompSensitivity;
+}
+
+/** The fit and its leave-one-out check, with and without the versioned-name comps. */
+export interface VersionedCompSensitivity {
+  /** How many comps carry a version marker in their name. */
+  n_versioned_comps: number;
+  /** Their slugs, in slug order. */
+  versioned_slugs: string[];
+  /** The fit on all comps, and its leave-one-out check (full model only). */
+  with_versioned: { intercept: number; slope: number; n_comps: number; loo_median_log_error: number; loo_median_factor_error_pct: number; loo_median_std_ape_pct: number };
+  /** The same, with the versioned-name comps removed from the pool before fitting. */
+  without_versioned: { intercept: number; slope: number; n_comps: number; loo_median_log_error: number; loo_median_factor_error_pct: number; loo_median_std_ape_pct: number };
 }
 
 /** Everything the dashboard needs: the board, the live set, and the model it runs. */
@@ -406,23 +455,41 @@ function impliedValueRadar1(protocol: SnapshotProtocol, asOf: string, model: Mod
 /**
  * The fit's own checks, measured on the snapshot's live-token comps — the only protocols whose
  * market cap is known, so the only ones a multiple can be checked against. Every fold refits
- * from TRAIN only: the held-out protocol or family never enters the fit, the fallback or any
- * outlier rule, so there is no family leakage. The growth and maturity multipliers are fixed
- * formulas, not fitted, and the validation scores the same final formula the board displays.
+ * from TRAIN only: the held-out protocol or category never enters the fit, the fallback or any
+ * outlier rule. That is refit-per-fold, not entity-disjoint validation: in leave-one-out, a
+ * held-out protocol's related products (same issuer, another version, another category) can
+ * still sit in the train set, and in the category split an entity that spans categories can
+ * still leak across them. The snapshot carries no parent/issuer linkage, so no check here can
+ * prove the folds are entity-disjoint — the limitation is labelled in the dashboard, not
+ * hidden. The growth and maturity multipliers are fixed formulas, not fitted, and the
+ * validation scores the same final formula the board displays.
  *
  * leave-one-out: each comp in turn is predicted from a fit on all the other comps. That tests
  * whether the fitted multiple generalises to a protocol it never saw.
  *
- * leave-one-family-out: each category with at least four comps in turn is predicted from a fit
- * on every other category's comps. That tests whether the size relationship generalises across
- * protocol families — not whether it predicts a future price or airdrop, which no check on this
- * one frozen snapshot can test. A median absolute percentage error near 200% says plainly what
- * the implied values are: order-of-magnitude proxies, not valuations.
+ * leave-one-category-out: each category with at least four comps in turn is predicted from a
+ * fit on every other category's comps. That tests whether the size relationship generalises
+ * across protocol categories — not whether it predicts a future price or airdrop, which no
+ * check on this one frozen snapshot can test, and not across protocol issuers, which the
+ * snapshot cannot group: a category is DefiLlama's label, not an issuer.
+ *
+ * Two error measures are reported side by side, because they answer different questions.
+ * The log error |log(pred / actual)| is the fit's own scale: the median of it is the headline,
+ * and the typical multiplicative factor is the median of exp(|log error|), computed directly
+ * from the per-prediction factors (not exp of the median log error — the two differ on
+ * even-sized samples). The factor error (exp(|log error|) − 1) × 100 is the symmetric
+ * multiplicative miss in per cent: predicting half the actual is a 100% factor error. The
+ * standard absolute percentage error |pred / actual − 1| × 100 is NOT the same number:
+ * predicting half the actual is a 50% standard APE. The old "APE" label on the factor error
+ * was a mislabel and is gone; both measures are now reported under their own names, for every
+ * variant and every category, so the mean's story can be read on the right metric. A median
+ * factor error near 220% says plainly what the implied values are: order-of-magnitude
+ * proxies, not valuations.
  *
  * The ablation scores the same held-out predictions with fewer of the model's parts: the flat
  * 0.25 house model, the size fit alone, the size fit with growth, and the full model. Pooled
- * figures are over all held-out predictions; macro figures average the per-family figures, so
- * a big family cannot hide a small one. Repeated model selection on these same folds makes the
+ * figures are over all held-out predictions; macro figures average the per-category figures, so
+ * a big category cannot hide a small one. Repeated model selection on these same folds makes the
  * numbers optimistic — they are reported as-is, without temporal forecast claims.
  */
 type VariantKey = 'flat' | 'sizeOnly' | 'sizeGrowth' | 'full';
@@ -434,68 +501,149 @@ const VARIANT_LABELS: Record<VariantKey, string> = {
   full: 'full (radar-2)',
 };
 
-/** An absolute percentage error from a |log(pred / actual)| error: the ratio miss, in per cent. */
-const apeOf = (e: number): number => Math.abs(Math.exp(e) - 1) * 100;
+/** A symmetric multiplicative (factor) error, in per cent, from a |log(pred / actual)| error:
+ * how many times too big or too small the prediction is, minus one, times 100. Predicting
+ * half the actual is a 100% factor error. This is NOT a standard APE. */
+const factorErrorPctOf = (e: number): number => Math.abs(Math.exp(e) - 1) * 100;
 
-function emptyErrors(): Record<VariantKey, number[]> {
-  return { flat: [], sizeOnly: [], sizeGrowth: [], full: [] };
+/** The standard absolute percentage error of one prediction, in per cent:
+ * |pred / actual − 1| × 100. Predicting half the actual is a 50% standard APE — the same
+ * prediction the factor error above scores at 100%. The two measures are not interchangeable. */
+const stdApeOf = (pred: number, actual: number): number => Math.abs(pred / actual - 1) * 100;
+
+/** One held-out prediction's two error measures, per variant. */
+interface VariantErrors {
+  /** |log(pred / actual)| per prediction. */
+  log: number[];
+  /** Standard APE |pred / actual − 1| × 100 per prediction. */
+  stdApe: number[];
 }
 
-/** One held-out check, pooled and per family, for the full model against radar-1. */
+function emptyErrors(): Record<VariantKey, VariantErrors> {
+  return { flat: { log: [], stdApe: [] }, sizeOnly: { log: [], stdApe: [] }, sizeGrowth: { log: [], stdApe: [] }, full: { log: [], stdApe: [] } };
+}
+
+/** One held-out check, pooled and per category, for the full model against radar-1. */
 function summarizeCheck(
   heldOut: string,
-  byVariant: Record<VariantKey, number[]>,
-  byFamily: Map<string, Record<VariantKey, number[]>>,
+  byVariant: Record<VariantKey, VariantErrors>,
+  byCategory: Map<string, Record<VariantKey, VariantErrors>>,
 ): ValidationCheck {
   const full = byVariant.full;
   const flat = byVariant.flat;
-  const perFamily: PerFamilyResult[] = [...byFamily.entries()]
+  const perCategory: PerCategoryResult[] = [...byCategory.entries()]
     .sort((a, b) => (a[0] < b[0] ? -1 : 1))
-    .map(([family, errs]) => ({
-      family,
-      n: errs.full.length,
-      median_log_error: round4(median(errs.full)),
-      median_ape_pct: Math.round(median(errs.full.map(apeOf))),
-      mean_ape_pct: Math.round(mean(errs.full.map(apeOf))),
-      radar1_median_log_error: round4(median(errs.flat)),
-      radar1_median_ape_pct: Math.round(median(errs.flat.map(apeOf))),
-      radar1_mean_ape_pct: Math.round(mean(errs.flat.map(apeOf))),
+    .map(([category, errs]) => ({
+      category,
+      n: errs.full.log.length,
+      median_log_error: round4(median(errs.full.log)),
+      median_factor_error_pct: Math.round(median(errs.full.log.map(factorErrorPctOf))),
+      mean_factor_error_pct: Math.round(mean(errs.full.log.map(factorErrorPctOf))),
+      median_std_ape_pct: round4(median(errs.full.stdApe)),
+      mean_std_ape_pct: round4(mean(errs.full.stdApe)),
+      radar1_median_log_error: round4(median(errs.flat.log)),
+      radar1_median_factor_error_pct: Math.round(median(errs.flat.log.map(factorErrorPctOf))),
+      radar1_mean_factor_error_pct: Math.round(mean(errs.flat.log.map(factorErrorPctOf))),
+      radar1_median_std_ape_pct: round4(median(errs.flat.stdApe)),
+      radar1_mean_std_ape_pct: round4(mean(errs.flat.stdApe)),
     }));
   return {
     held_out: heldOut,
-    n: full.length,
-    median_log_error: round4(median(full)),
-    median_ape_pct: Math.round(median(full.map(apeOf))),
-    mean_ape_pct: Math.round(mean(full.map(apeOf))),
-    radar1_median_log_error: round4(median(flat)),
-    radar1_median_ape_pct: Math.round(median(flat.map(apeOf))),
-    radar1_mean_ape_pct: Math.round(mean(flat.map(apeOf))),
-    macro_median_log_error: round4(mean(perFamily.map((f) => f.median_log_error))),
-    macro_mean_ape_pct: Math.round(mean(perFamily.map((f) => f.mean_ape_pct))),
-    per_family: perFamily,
+    n: full.log.length,
+    median_log_error: round4(median(full.log)),
+    median_factor: round4(median(full.log.map((e) => Math.exp(e)))),
+    median_factor_error_pct: Math.round(median(full.log.map(factorErrorPctOf))),
+    mean_factor_error_pct: Math.round(mean(full.log.map(factorErrorPctOf))),
+    median_std_ape_pct: round4(median(full.stdApe)),
+    mean_std_ape_pct: round4(mean(full.stdApe)),
+    radar1_median_log_error: round4(median(flat.log)),
+    radar1_median_factor: round4(median(flat.log.map((e) => Math.exp(e)))),
+    radar1_median_factor_error_pct: Math.round(median(flat.log.map(factorErrorPctOf))),
+    radar1_mean_factor_error_pct: Math.round(mean(flat.log.map(factorErrorPctOf))),
+    radar1_median_std_ape_pct: round4(median(flat.stdApe)),
+    radar1_mean_std_ape_pct: round4(mean(flat.stdApe)),
+    macro_median_log_error: round4(mean(perCategory.map((f) => f.median_log_error))),
+    macro_mean_factor_error_pct: Math.round(mean(perCategory.map((f) => f.mean_factor_error_pct))),
+    macro_median_std_ape_pct: round4(mean(perCategory.map((f) => f.median_std_ape_pct))),
+    macro_mean_std_ape_pct: round4(mean(perCategory.map((f) => f.mean_std_ape_pct))),
+    per_category: perCategory,
   };
 }
 
 function ablationRow(
   key: VariantKey,
-  loo: Record<VariantKey, number[]>,
-  lofo: Record<VariantKey, number[]>,
+  loo: Record<VariantKey, VariantErrors>,
+  loco: Record<VariantKey, VariantErrors>,
 ): AblationVariant {
   return {
     variant: VARIANT_LABELS[key],
-    loo_median_log_error: round4(median(loo[key])),
-    loo_median_ape_pct: Math.round(median(loo[key].map(apeOf))),
-    loo_mean_ape_pct: Math.round(mean(loo[key].map(apeOf))),
-    lofo_median_log_error: round4(median(lofo[key])),
-    lofo_median_ape_pct: Math.round(median(lofo[key].map(apeOf))),
-    lofo_mean_ape_pct: Math.round(mean(lofo[key].map(apeOf))),
+    loo_median_log_error: round4(median(loo[key].log)),
+    loo_median_factor_error_pct: Math.round(median(loo[key].log.map(factorErrorPctOf))),
+    loo_mean_factor_error_pct: Math.round(mean(loo[key].log.map(factorErrorPctOf))),
+    loo_median_std_ape_pct: round4(median(loo[key].stdApe)),
+    loo_mean_std_ape_pct: round4(mean(loo[key].stdApe)),
+    loco_median_log_error: round4(median(loco[key].log)),
+    loco_median_factor_error_pct: Math.round(median(loco[key].log.map(factorErrorPctOf))),
+    loco_mean_factor_error_pct: Math.round(mean(loco[key].log.map(factorErrorPctOf))),
+    loco_median_std_ape_pct: round4(median(loco[key].stdApe)),
+    loco_mean_std_ape_pct: round4(mean(loco[key].stdApe)),
+  };
+}
+
+/**
+ * The versioned-comp sensitivity: the fit and its leave-one-out check (full model only) with
+ * and without the comps whose names carry a version marker. compsOf excludes versioned
+ * *candidates* from the board, but it does NOT exclude versioned *comps* from the fit — so a
+ * versioned product's market cap can enter the multiple. The one versioned comp here is
+ * Aave V2: the only Aave product in the snapshot that records the AAVE token's market cap
+ * ($1.72B), while Aave V3 ($14.36B of TVL) records none — the parent token's market cap is
+ * attributed to one version's TVL, a comparable mismatch the sensitivity makes visible.
+ * The check does not delete Aave V2 for its name: it reports what changes without it.
+ */
+export function versionedSensitivity(
+  snapshot: Snapshot,
+  model: ModelConstants = MODEL,
+): VersionedCompSensitivity {
+  const comps = compsOf(snapshot);
+  const versioned = comps.filter((p) => VERSIONED.test(p.name));
+  const looFull = (pool: SnapshotProtocol[]): { log: number[]; stdApe: number[] } => {
+    const log: number[] = [];
+    const stdApe: number[] = [];
+    for (let i = 0; i < pool.length; i++) {
+      const train = pool.slice(0, i).concat(pool.slice(i + 1));
+      const fit = fitMultiple(train);
+      const p = pool[i]!;
+      const pred = impliedValue(p, snapshot.as_of, fit, model).implied;
+      log.push(Math.abs(Math.log(pred / p.mcap_usd!)));
+      stdApe.push(stdApeOf(pred, p.mcap_usd!));
+    }
+    return { log, stdApe };
+  };
+  const summarize = (pool: SnapshotProtocol[]): VersionedCompSensitivity['with_versioned'] => {
+    const fit = fitMultiple(pool);
+    const errs = looFull(pool);
+    return {
+      intercept: round4(fit.intercept),
+      slope: round4(fit.slope),
+      n_comps: pool.length,
+      loo_median_log_error: round4(median(errs.log)),
+      loo_median_factor_error_pct: Math.round(median(errs.log.map(factorErrorPctOf))),
+      loo_median_std_ape_pct: round4(median(errs.stdApe)),
+    };
+  };
+  const rest = comps.filter((p) => !VERSIONED.test(p.name));
+  return {
+    n_versioned_comps: versioned.length,
+    versioned_slugs: versioned.map((p) => p.slug).sort(),
+    with_versioned: summarize(comps),
+    without_versioned: summarize(rest),
   };
 }
 
 export function validateFit(
   snapshot: Snapshot,
   model: ModelConstants = MODEL,
-): { leave_one_out: ValidationCheck; leave_one_family_out: ValidationCheck; ablation: AblationVariant[] } {
+): { leave_one_out: ValidationCheck; leave_one_category_out: ValidationCheck; ablation: AblationVariant[] } {
   const comps = compsOf(snapshot);
   const logErr = (pred: number, actual: number): number => Math.abs(Math.log(pred / actual));
 
@@ -511,22 +659,24 @@ export function validateFit(
   };
 
   const loo = emptyErrors();
-  const lofo = emptyErrors();
-  const looByFamily = new Map<string, Record<VariantKey, number[]>>();
-  const lofoByFamily = new Map<string, Record<VariantKey, number[]>>();
+  const loco = emptyErrors();
+  const looByCategory = new Map<string, Record<VariantKey, VariantErrors>>();
+  const locoByCategory = new Map<string, Record<VariantKey, VariantErrors>>();
   const record = (
-    acc: Record<VariantKey, number[]>,
-    byFamily: Map<string, Record<VariantKey, number[]>>,
-    family: string,
+    acc: Record<VariantKey, VariantErrors>,
+    byCategory: Map<string, Record<VariantKey, VariantErrors>>,
+    category: string,
     vs: Record<VariantKey, number>,
     actual: number,
   ): void => {
     for (const k of VARIANTS) {
       const e = logErr(vs[k], actual);
-      acc[k].push(e);
-      const fam = byFamily.get(family) ?? emptyErrors();
-      fam[k].push(e);
-      byFamily.set(family, fam);
+      acc[k].log.push(e);
+      acc[k].stdApe.push(stdApeOf(vs[k], actual));
+      const cat = byCategory.get(category) ?? emptyErrors();
+      cat[k].log.push(e);
+      cat[k].stdApe.push(stdApeOf(vs[k], actual));
+      byCategory.set(category, cat);
     }
   };
 
@@ -534,7 +684,7 @@ export function validateFit(
     const pool = comps.slice(0, i).concat(comps.slice(i + 1));
     const fit = fitMultiple(pool);
     const p = comps[i]!;
-    record(loo, looByFamily, p.category!, variantsOf(p, fit), p.mcap_usd!);
+    record(loo, looByCategory, p.category!, variantsOf(p, fit), p.mcap_usd!);
   }
 
   const byCategory = new Map<string, SnapshotProtocol[]>();
@@ -548,14 +698,14 @@ export function validateFit(
     const pool = comps.filter((p) => p.category !== category);
     const fit = fitMultiple(pool);
     for (const p of members) {
-      record(lofo, lofoByFamily, category, variantsOf(p, fit), p.mcap_usd!);
+      record(loco, locoByCategory, category, variantsOf(p, fit), p.mcap_usd!);
     }
   }
 
   return {
-    leave_one_out: summarizeCheck('one live-token protocol at a time', loo, looByFamily),
-    leave_one_family_out: summarizeCheck('one whole category (family) at a time', lofo, lofoByFamily),
-    ablation: VARIANTS.map((k) => ablationRow(k, loo, lofo)),
+    leave_one_out: summarizeCheck('one live-token protocol at a time', loo, looByCategory),
+    leave_one_category_out: summarizeCheck('one whole category at a time', loco, locoByCategory),
+    ablation: VARIANTS.map((k) => ablationRow(k, loo, loco)),
   };
 }
 
@@ -611,7 +761,7 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): {
 
   const fit = fitMultiple(compsOf(snapshot));
   // Launch-comparable comps per category: a row's category with fewer than 4 comps has no
-  // family-level validation, so its implied value is labelled low-confidence (see the dashboard).
+  // category-level validation, so its implied value is labelled sparse category support (see the dashboard).
   const compCounts = new Map<string, number>();
   for (const p of compsOf(snapshot)) compCounts.set(p.category!, (compCounts.get(p.category!) ?? 0) + 1);
   const scored = [...chosen.values()].map((p) => {
@@ -634,7 +784,7 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): {
     token_status: 'pre-token' as const,
     age_days: s.age,
     implied_value_usd: s.implied,
-    low_confidence: (compCounts.get(s.p.category ?? '') ?? 0) < 4,
+    sparse_support: (compCounts.get(s.p.category ?? '') ?? 0) < 4,
     model: {
       multiple: round4(s.multiple),
       growth_pct: s.growthPct,
@@ -698,9 +848,16 @@ function actionFor(p: SnapshotProtocol, capital: number, chain: string): string 
 /**
  * A protocol's farm plan: seven steps, each an action with a cost and a time. The plan is derived
  * from the protocol's own record (category, chains, TVL, age), never from a hand-written list of
- * names. The last step states the plan's assumptions outright: the capital, gas and hold figures
- * are estimates from typical costs, not verified fees, and nothing here promises eligibility, a
- * points program or a reward — the snapshot carries no such facts, so the plan invents none.
+ * names. Every step that depends on something the snapshot does not show is written as a
+ * CONDITIONAL scenario, not a claim: the action step first asks the reader to verify the
+ * protocol's official interface supports it (asset, network, minimum — all unverified from the
+ * snapshot); the weekly step applies only if the protocol runs a rewards program (the snapshot
+ * does not say it does); the hold is a scenario, not a proven qualifying duration. Costs are
+ * ASSUMED BUDGETS per step, never verified fees: TVL does not prove a minimum capital, age
+ * does not prove a qualifying duration, and claiming may cost network gas. A disclaimer in the
+ * last step does not cancel claims made in earlier steps, so the earlier steps are conditional
+ * themselves. Nothing here promises eligibility, a points program or a reward, and this entry
+ * never executes transactions — every step is a scenario to check, not an instruction to transact.
  */
 export function farmSteps(p: SnapshotProtocol, age: number | null, tvlUsd: number): FarmStep[] {
   const chain = chainOf(p);
@@ -708,30 +865,31 @@ export function farmSteps(p: SnapshotProtocol, age: number | null, tvlUsd: numbe
   const hold = holdDaysFor(age);
   const action = actionFor(p, capital, chain);
   const gas = capital >= 150 ? 8 : 4;
+  const actionLower = action.charAt(0).toLowerCase() + action.slice(1);
   return [
     {
       text: `Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.`,
-      cost: 'under $3 of gas for the first transaction',
+      cost: 'assumed budget under $3 of gas for the first transaction (not a verified fee)',
       time: '5 minutes',
     },
     {
-      text: action,
-      cost: `$${capital} of capital and about $${gas} of gas`,
+      text: `First verify on ${p.name}'s official interface that it supports this action on ${chain} — the snapshot does not confirm the interface, the asset, the network or any minimum. If it does, ${actionLower}`,
+      cost: `$${capital} of capital (assumed budget) and about $${gas} of gas (assumed, not verified)`,
       time: '15 minutes to set up',
     },
     {
-      text: `Make one qualifying action each week, such as a deposit, a borrow, a swap or a vote.`,
-      cost: 'about $2 of gas a week',
+      text: `If the protocol runs a rewards or points program — check its official pages first, because the snapshot does not say it does — consider one small action a week, such as a deposit, a borrow, a swap or a vote. There is no snapshot evidence that weekly actions change eligibility.`,
+      cost: 'assumed budget about $2 of gas a week (not a verified fee)',
       time: '10 minutes a week',
     },
     {
-      text: `Hold the position for at least ${hold} days so the activity is counted in more than one snapshot.`,
+      text: `Hold the position for at least ${hold} days as a long-hold scenario. The snapshot does not prove a longer hold changes eligibility, and age is not proof of a qualifying duration — treat this as an untested assumption.`,
       cost: `the $${capital} stays in the position`,
       time: `${hold} days`,
     },
     {
-      text: `Before you withdraw, check whether the protocol publishes a points or rewards page, and claim only from a link it publishes.`,
-      cost: 'no fee to check, and never pay to claim',
+      text: `Before you withdraw, check whether the protocol publishes a points or rewards page, and claim only from a link it publishes. Claiming itself may cost network gas; the snapshot carries no fee figures.`,
+      cost: 'no fee to check; claiming may cost gas (amount unverified)',
       time: '10 minutes',
     },
     {
@@ -740,7 +898,7 @@ export function farmSteps(p: SnapshotProtocol, age: number | null, tvlUsd: numbe
       time: '5 minutes',
     },
     {
-      text: `Assumptions behind this plan: $${capital} of capital, about $${gas} of gas to enter, a ${hold}-day hold, on a protocol with $${Math.round(tvlUsd / 1_000_000)}M of TVL. These are estimates from typical costs, not verified fees, and nothing here promises eligibility, a points program or a reward.`,
+      text: `Assumptions behind this plan: $${capital} of capital (an assumed budget, not a minimum the protocol requires — TVL does not prove a minimum), about $${gas} of gas to enter (assumed, not verified), a ${hold}-day hold (a scenario, not a proven qualifying duration — age does not prove one), on a protocol with $${Math.round(tvlUsd / 1_000_000)}M of TVL. These are estimates from typical costs, not verified fees, and nothing here promises eligibility, a points program or a reward. This entry never executes transactions; every step is a scenario to check, not an instruction to transact.`,
       cost: 'no extra cost',
       time: 'read this before you start',
     },
@@ -784,7 +942,7 @@ export function radarRow(row: BoardRow, onWatchlist: boolean, compCounts: Map<st
     growth_multiplier: row.model.growth_multiplier,
     maturity_multiplier: row.model.maturity_multiplier,
     watchlist: onWatchlist,
-    low_confidence: row.low_confidence,
+    sparse_support: row.sparse_support,
     category_comps: compCounts.get(row.category ?? '') ?? 0,
   };
 }
@@ -847,8 +1005,9 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
       candidates_tvl_max: Math.max(...board.map((r) => r.tvl_usd)),
       comps_by_category: compsByCategory,
       leave_one_out: validation.leave_one_out,
-      leave_one_family_out: validation.leave_one_family_out,
+      leave_one_category_out: validation.leave_one_category_out,
       ablation: validation.ablation,
+      versioned_comp_sensitivity: versionedSensitivity(snapshot, model),
     },
     watchlist_size: snapshot.watchlist.length,
     board_size: board.length,

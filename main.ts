@@ -88,6 +88,6 @@ process.stdout.write(
   `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.early_excluded} early candidates excluded by the classification rule, ${radar.live_size} live set aside)\n` +
     `token radar: model radar-2 fit log(mcap/TVL) = ${radar.fit.intercept} + ${radar.fit.slope} * log(TVL) on ${radar.fit.n_comps} comps; ` +
     `leave-one-out median |log error| ${radar.fit.leave_one_out.median_log_error} vs radar-1 ${radar.fit.leave_one_out.radar1_median_log_error}; ` +
-    `leave-one-family-out ${radar.fit.leave_one_family_out.median_log_error} vs radar-1 ${radar.fit.leave_one_family_out.radar1_median_log_error}\n` +
+    `leave-one-category-out ${radar.fit.leave_one_category_out.median_log_error} vs radar-1 ${radar.fit.leave_one_category_out.radar1_median_log_error}\n` +
     `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (${dashFiles.length} files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
 );

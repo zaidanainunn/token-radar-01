@@ -29,13 +29,15 @@
     <strong>94</strong> launch-comparable live-token protocols in this one frozen snapshot (DefiLlama,
     2026-11-14) — not from a rule anyone chose.</p>
     <p class="warn"><strong>PROXY — read this as order-of-magnitude, not a price.</strong> The typical error
-    is <strong>~210%</strong> (leave-one-family-out median); the mean error is in the thousands of per cent
-    because a few protocols trade at 19&times;&ndash;400&times; their TVL or under 1% of it. It is not a
+    is a factor of <strong>~3.1&times;</strong> (leave-one-category-out median |log error| 1.13; median
+    standard APE 81%). The mean factor error is 1,505% and the mean standard APE 689%, because a
+    few protocols trade at 19&times;&ndash;400&times; their TVL or under 1% of it. It is not a
     valuation, not an FDV, and not a forecast of whether or when a token launches or what it would trade at.</p>
-    <p><strong>Confidence is labelled per row.</strong> 79 of 178 rows sit in categories checked
-    leave-one-family-out; the other <strong>99 carry a LOW CONFIDENCE tag</strong> — fewer than 4
-    launch-comparable comps in their category, so the fitted multiple is extrapolated with no family-level
-    check. All 33 Risk Curators are tagged: their category has a single comp.</p>
+    <p><strong>Support is labelled per row.</strong> 79 of 178 rows sit in categories checked
+    leave-one-category-out; the other <strong>99 carry a sparse category support tag</strong> — fewer than 4
+    launch-comparable comps in their category, so the fitted multiple is extrapolated with no category-level
+    check. That tag is a count label, not a calibrated probability — and four or more comps is not high
+    confidence either. All 33 Risk Curators are tagged: their category has a single comp.</p>
   </section>
 
   <section class="card controls" id="controls">
@@ -90,15 +92,18 @@
     exchange tokens excluded — their TVL is not a launch). The multiple is clamped to 0.01&ndash;3.0, so
     a $5M protocol gets &times;0.83, a $50M one &times;0.21, a $500M one &times;0.05 and a $5B one &times;0.01.
     Growth is the 7-day TVL change clamped to &minus;60…+120% (weight 0.5); maturity is 0.6 + up to 0.4
-    for age up to 1,095 days (unknown age counts as 365). The same function scores every row; no
-    protocol name is ever special-cased.</p>
+    for age up to 1,095 days (unknown age counts as 365 days — an imputation, not a fact:
+    <code>listed_at</code> is the day DefiLlama began tracking the protocol, &ldquo;time tracked by
+    DefiLlama; proxy only&rdquo;, not necessarily its age or how long it has run with no token). The same
+    function scores every row; no protocol name is ever special-cased.</p>
     <p><strong>The formula in power-law form.</strong> exp(8.9978) = 8085, so before the clamp the model is
     implied = 8085 &times; TVL<sup>0.4049</sup> &times; growth &times; maturity, with TVL in whole US dollars.
     The fit&rsquo;s target is log(mcap_usd&nbsp;/&nbsp;TVL_usd) regressed on log(TVL_usd); a comp enters only with
     mcap&nbsp;&gt;&nbsp;0, TVL&nbsp;&gt;&nbsp;0 and a recorded category, and a missing 7-day change counts as 0% while a
-    missing listing date counts as 365 days of age. The coefficients come from least squares on the snapshot,
+    missing listing date counts as 365 days of age (an imputation, not a fact). The coefficients come from least squares on the snapshot,
     not from a rule anyone chose; the fit&rsquo;s centre is geometric (no smearing correction), which is why the
-    errors below are reported on the log scale and as percentages. The clamp never binds on this board: it
+    errors below are reported on the log scale, as factor errors and as standard APEs — three measures of
+    the same misses, defined below. The clamp never binds on this board: it
     would bind below $581K and above $8.4B, while the board spans $5.0M&ndash;$2.75B and the comps span
     $5.0M&ndash;$10.2B — the fit interpolates, it does not extrapolate past the protocols it learned from.</p>
     <p><strong>The multiple is a PROXY.</strong> A circulating market cap is not a protocol valuation and
@@ -107,15 +112,36 @@
     or what it would trade at afterwards.</p>
     <p><strong>Checked, not just fitted.</strong> Leave-one-out on the 94 comps (each protocol predicted
     from a fit on the other 93, refit per fold — the held-out protocol never enters its own fit):
-    median |log error| <strong>1.17</strong> (median error 223%) against
-    <strong>1.51</strong> (351%) for the flat &times;0.25 house model. Leave-one-family-out (each category
-    predicted from a fit on all other categories, n&nbsp;=&nbsp;59): <strong>1.13</strong> (210%) against
-    1.39 (302%). Per-category multiples were fitted and tested too, and <em>rejected</em>: leave-one-out
+    median |log error| <strong>1.17</strong>, typical factor <strong>3.2&times;</strong>, median factor
+    error <strong>223%</strong>, median standard APE <strong>86%</strong> — against
+    <strong>1.51</strong>, 4.5&times;, 351%, 88% for the flat &times;0.25 house model.
+    Leave-one-category-out (each category predicted from a fit on all other categories, n&nbsp;=&nbsp;59):
+    <strong>1.13</strong>, 3.1&times;, 210%, 81% against 1.39, 4.0&times;, 302%, 81%.
+    Per-category multiples were fitted and tested too, and <em>rejected</em>: leave-one-out
     1.60, worse than the flat multiple, because ratios inside a category still span orders of magnitude.
-    The check tests generalisation across protocol families on this one frozen snapshot — nothing more.</p>
-    <h3>Ablation — each part earns its place on the median, not on the mean</h3>
+    The check tests generalisation across protocol categories on this one frozen snapshot — nothing more.
+    It is not entity-disjoint validation: the snapshot carries no parent or issuer linkage, so a held-out
+    protocol&rsquo;s related products can still sit in the train set, and an entity spanning categories can
+    still leak across them.</p>
+    <p><strong>Two error measures, not one.</strong> The factor error (exp(|log error|) &minus; 1) &times; 100
+    is the symmetric multiplicative miss: predicting half the actual is a 100% factor error. The standard
+    absolute percentage error |pred / actual &minus; 1| &times; 100 is the familiar one: predicting half the
+    actual is a 50% standard APE. An earlier version of this board labelled the factor error &ldquo;APE&rdquo; —
+    that was a mislabel, corrected here; both measures are now reported under their own names, for every
+    variant and every category. The median |log error| is the headline; the typical factor is the median of
+    exp(|log error|) over the predictions, computed directly — not exp of the median log error, which differs
+    on even-sized samples.</p>
+    <p><strong>One comp carries a version marker: Aave V2</strong> (Lending, $90.9M TVL, $1.72B market cap,
+    19&times; its TVL). It is the only Aave product in the snapshot that records the AAVE token&rsquo;s market
+    cap — Aave V3 ($14.36B of TVL) records none — so the parent token&rsquo;s market cap is attributed to one
+    version&rsquo;s TVL, a comparable mismatch. The fit keeps it (the classification rule excludes versioned
+    candidates from the board, not versioned comps from the fit) and the sensitivity is reported: without
+    Aave V2 the fit is intercept 9.2562, slope &minus;0.6130 on 93 comps, leave-one-out median |log error|
+    1.1556 (was 1.1710), median factor error 218% (was 223%), median standard APE 85.05% (was 86.28%).
+    The fit is not driven by that one comp.</p>
+    <h3>Ablation — each part earns its place on the median log error, not on every metric</h3>
     <table class="vtable">
-      <thead><tr><th>Variant</th><th class="num">LOO median |log err|</th><th class="num">LOO median APE</th><th class="num">LOO mean APE</th><th class="num">LOFO median |log err|</th><th class="num">LOFO median APE</th><th class="num">LOFO mean APE</th></tr></thead>
+      <thead><tr><th>Variant</th><th class="num">LOO median |log err|</th><th class="num">LOO median factor err</th><th class="num">LOO mean factor err</th><th class="num">LOCO median |log err|</th><th class="num">LOCO median factor err</th><th class="num">LOCO mean factor err</th></tr></thead>
       <tbody>
         <tr><td>flat &times;0.25 (radar-1, house model)</td><td class="num">1.5065</td><td class="num">351%</td><td class="num">4,351%</td><td class="num">1.3913</td><td class="num">302%</td><td class="num">1,279%</td></tr>
         <tr><td>size-only</td><td class="num">1.2946</td><td class="num">265%</td><td class="num">1,822%</td><td class="num">1.2982</td><td class="num">266%</td><td class="num">1,391%</td></tr>
@@ -123,46 +149,63 @@
         <tr><td><strong>full (radar-2, this board)</strong></td><td class="num"><strong>1.1710</strong></td><td class="num"><strong>223%</strong></td><td class="num"><strong>2,352%</strong></td><td class="num"><strong>1.1316</strong></td><td class="num"><strong>210%</strong></td><td class="num"><strong>1,505%</strong></td></tr>
       </tbody>
     </table>
-    <p>Every added part improves the <em>median</em> — the typical protocol is predicted better at each step.
-    The <em>mean</em> APE tells a different story and is reported as-is: it stays in the thousands of per cent
-    for every variant, and on leave-one-family-out the full model&rsquo;s mean (1,505%) is worse than the flat
-    model&rsquo;s (1,279%) even as its median is better. The mean is a tail story: 22 of the 94 comps miss by
-    more than 1,000%, and four miss by more than 10,000% — rain&rsquo;s market cap is 400&times; its TVL,
-    bitway-earn 36&times;, aave-v2 19&times;, while concentrator&rsquo;s is 0.13% of its TVL and obol&rsquo;s 0.06%.
-    The fitted line cannot reach either tail, and no variant tested does. The median is the representative
-    number; the mean is kept here so the tails are not hidden.</p>
-    <p><strong>Pooled vs macro.</strong> The pooled numbers above weight every prediction equally, so the big
-    families dominate. A macro average weights every family equally instead: leave-one-out macro median
-    1.59 (macro mean APE 4,608%) against pooled 1.17 (2,352%); leave-one-family-out macro median 1.12
-    (macro mean APE 1,310%) against pooled 1.13 (1,505%). The macro is worse on leave-one-out because the
-    small families (one to three comps) have the largest errors and count as much as the big ones.</p>
-    <h3>Leave-one-family-out, per family</h3>
     <table class="vtable">
-      <thead><tr><th>Family</th><th class="num">Comps</th><th class="num">radar-2 median |log err|</th><th class="num">radar-1 median |log err|</th><th class="num">radar-2 mean APE</th><th class="num">radar-1 mean APE</th><th>Median verdict</th></tr></thead>
+      <thead><tr><th>Variant — standard APE</th><th class="num">LOO median std APE</th><th class="num">LOO mean std APE</th><th class="num">LOCO median std APE</th><th class="num">LOCO mean std APE</th></tr></thead>
       <tbody>
-        <tr><td>Basis Trading</td><td class="num">7</td><td class="num">0.8277</td><td class="num">1.4463</td><td class="num">3,267%</td><td class="num">3,198%</td><td>wins</td></tr>
-        <tr><td>Cross Chain Bridge</td><td class="num">4</td><td class="num">1.3917</td><td class="num">1.2859</td><td class="num">357%</td><td class="num">710%</td><td>loses</td></tr>
-        <tr><td>Dexs</td><td class="num">11</td><td class="num">1.3981</td><td class="num">1.7553</td><td class="num">711%</td><td class="num">616%</td><td>wins</td></tr>
-        <tr><td>Lending</td><td class="num">15</td><td class="num">1.7863</td><td class="num">1.7562</td><td class="num">2,468%</td><td class="num">1,396%</td><td>loses</td></tr>
-        <tr><td>RWA</td><td class="num">9</td><td class="num">0.6563</td><td class="num">0.7055</td><td class="num">106%</td><td class="num">174%</td><td>wins</td></tr>
-        <tr><td>Yield</td><td class="num">9</td><td class="num">1.3023</td><td class="num">1.3913</td><td class="num">1,942%</td><td class="num">2,222%</td><td>wins</td></tr>
-        <tr><td>Yield Aggregator</td><td class="num">4</td><td class="num">0.5034</td><td class="num">1.1299</td><td class="num">316%</td><td class="num">233%</td><td>wins</td></tr>
+        <tr><td>flat &times;0.25 (radar-1, house model)</td><td class="num">87.60%</td><td class="num">818.62%</td><td class="num">81.09%</td><td class="num">516.02%</td></tr>
+        <tr><td>size-only</td><td class="num">83.59%</td><td class="num">651.28%</td><td class="num">81.90%</td><td class="num">828.81%</td></tr>
+        <tr><td>size + growth</td><td class="num">84.41%</td><td class="num">627.45%</td><td class="num">81.09%</td><td class="num">795.98%</td></tr>
+        <tr><td><strong>full (radar-2, this board)</strong></td><td class="num"><strong>86.28%</strong></td><td class="num"><strong>532.35%</strong></td><td class="num"><strong>81.09%</strong></td><td class="num"><strong>688.67%</strong></td></tr>
       </tbody>
     </table>
-    <p>The size fit wins 5 of 7 families on the median and loses 2 — Cross Chain Bridge (n&nbsp;=&nbsp;4,
-    1.39 vs 1.29) and Lending (n&nbsp;=&nbsp;15, 1.79 vs 1.76), both narrow losses. The mean APE disagrees with
-    the median in two families (Basis Trading and Dexs win the median but lose the mean), because a single
-    extreme comp in a family dominates its mean. Only families with 4 or more comps are tabled: below that,
-    a family-level check has too few points to mean anything, and rows in those categories carry the
-    LOW CONFIDENCE tag instead.</p>
+    <p>Every added part improves the <em>median |log error|</em> and the <em>median factor error</em> at each
+    step. On standard APE the picture is flatter: the leave-one-out median standard APE is 83&ndash;88% for
+    every variant (best: size-only, 83.59%), and the leave-one-category-out median is ~81% for all four.
+    On standard APE means the full model wins leave-one-out (532% vs 819% flat) but loses
+    leave-one-category-out to flat (689% vs 516%). The size fit&rsquo;s edge is a log-scale edge: it predicts
+    the typical protocol better, and it does not make the standard APE materially better. The mean factor
+    error tells a tail story: 22 of the 94 comps miss by more than 1,000%, and four miss by more than
+    10,000% — rain&rsquo;s market cap is 400&times; its TVL, bitway-earn 36&times;, aave-v2 19&times;, while
+    concentrator&rsquo;s is 0.13% of its TVL and obol&rsquo;s 0.06%. The fitted line cannot reach either tail, and
+    no variant tested does. The median is the representative number; the mean is kept here so the tails are
+    not hidden.</p>
+    <p><strong>Pooled vs macro.</strong> The pooled numbers above weight every prediction equally, so the big
+    categories dominate. A macro average weights every category equally instead: leave-one-out macro median
+    1.59 (macro mean factor error 4,608%; macro median standard APE 266.61%) against pooled 1.17 (2,352%;
+    86.28%); leave-one-category-out macro median 1.12 (macro mean factor error 1,310%; macro median
+    standard APE 76.60%) against pooled 1.13 (1,505%; 81.09%). The macro is worse on leave-one-out because
+    the small categories (one to three comps) have the largest errors and count as much as the big ones.</p>
+    <h3>Leave-one-category-out, per category</h3>
+    <table class="vtable">
+      <thead><tr><th>Category</th><th class="num">Comps</th><th class="num">radar-2 median |log err|</th><th class="num">radar-1 median |log err|</th><th class="num">radar-2 median std APE</th><th class="num">radar-1 median std APE</th><th class="num">radar-2 mean factor err</th><th class="num">radar-1 mean factor err</th><th>Median verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Basis Trading</td><td class="num">7</td><td class="num">0.8277</td><td class="num">1.4463</td><td class="num">56.29%</td><td class="num">81.09%</td><td class="num">3,267%</td><td class="num">3,198%</td><td>wins</td></tr>
+        <tr><td>Cross Chain Bridge</td><td class="num">4</td><td class="num">1.3917</td><td class="num">1.2859</td><td class="num">84.23%</td><td class="num">59.22%</td><td class="num">357%</td><td class="num">710%</td><td>loses</td></tr>
+        <tr><td>Dexs</td><td class="num">11</td><td class="num">1.3981</td><td class="num">1.7553</td><td class="num">87.43%</td><td class="num">86.63%</td><td class="num">711%</td><td class="num">616%</td><td>wins</td></tr>
+        <tr><td>Lending</td><td class="num">15</td><td class="num">1.7863</td><td class="num">1.7562</td><td class="num">99.43%</td><td class="num">96.72%</td><td class="num">2,468%</td><td class="num">1,396%</td><td>loses</td></tr>
+        <tr><td>RWA</td><td class="num">9</td><td class="num">0.6563</td><td class="num">0.7055</td><td class="num">49.10%</td><td class="num">74.39%</td><td class="num">106%</td><td class="num">174%</td><td>wins</td></tr>
+        <tr><td>Yield</td><td class="num">9</td><td class="num">1.3023</td><td class="num">1.3913</td><td class="num">87.88%</td><td class="num">77.59%</td><td class="num">1,942%</td><td class="num">2,222%</td><td>wins</td></tr>
+        <tr><td>Yield Aggregator</td><td class="num">4</td><td class="num">0.5034</td><td class="num">1.1299</td><td class="num">71.85%</td><td class="num">155.46%</td><td class="num">316%</td><td class="num">233%</td><td>wins</td></tr>
+      </tbody>
+    </table>
+    <p>The size fit wins 5 of 7 categories on the median |log error| and loses 2 — Cross Chain Bridge
+    (n&nbsp;=&nbsp;4, 1.39 vs 1.29) and Lending (n&nbsp;=&nbsp;15, 1.79 vs 1.76), both narrow losses. The two losses
+    cannot be called noise or significant without an uncertainty evaluation — they are reported
+    descriptively. On median standard APE the wins are 3 of 7: Dexs and Yield flip from wins on the log
+    scale, because standard APE weights over-predictions differently from the symmetric log error. The mean
+    factor error disagrees with the median in two categories (Basis Trading and Dexs win the median but lose
+    the mean), because a single extreme comp in a category dominates its mean. Only categories with 4 or
+    more comps are tabled: below that, a category-level check has too few points to mean anything, and rows
+    in those categories carry the sparse category support tag instead.</p>
     <h3>Risk Curators — the board&rsquo;s largest category, and its least checked</h3>
     <p>33 rows are Risk Curators (12 watchlist + 21 early) — the board&rsquo;s largest category — and their
-    category has exactly <strong>one</strong> launch-comparable comp, so no family-level check exists for
-    them. Every curator row carries a LOW CONFIDENCE tag. Their TVL is the vaults they manage; the sealed
+    category has exactly <strong>one</strong> launch-comparable comp (Api3), so no category-level check exists for
+    them. Every curator row carries a sparse category support tag. Their TVL is the vaults they manage; the sealed
     snapshot has no <code>parentProtocol</code> field and no vault linkage, so the board cannot tell whether
     a curator&rsquo;s TVL and its vaults&rsquo; TVL count the same assets twice. The smoke test the snapshot does
     allow: no two board rows share an exact TVL, and 7 groups of rows share a first name word (15 rows,
-    for example a curator and its vaults) — reported, not resolved. Curator farm plans describe a deposit
+    for example a curator and its vaults) — reported, not resolved. Implied values are never summed into a
+    total: correlated proxies are not an independent opportunity. Curator farm plans describe a deposit
     into a vault the curator manages, not an interaction with the curator and not eligibility for any
     curator token.</p>
     <p><strong>Coverage — the whole universe, not just the ledger.</strong> The snapshot holds 758 protocols:
@@ -178,8 +221,9 @@
     138 early. Say a protocol <em>records no token</em>, never that it has none: DefiLlama&rsquo;s record is
     not proof. The watchlist is a floor, never a ceiling.</p>
     <p class="fine">Source: DefiLlama https://api.llama.fi/protocols, fetched 2026-11-14. Model radar-2.
-    Farm plans state their assumptions in their last step; costs are estimates from typical gas, not
-    verified fees, and nothing here promises eligibility, a points program or a reward.</p>
+    Farm plans are conditional scenarios: each step that depends on something the snapshot does not show
+    says so, and costs are assumed budgets per step, not verified fees. Nothing here promises eligibility,
+    a points program or a reward, and this entry never executes transactions.</p>
   </section>
 
   <section class="card">
@@ -201,7 +245,7 @@
   <footer class="fine">
     Token Radar, model radar-2. Data: DefiLlama snapshot 2026-11-14, read-only. Implied values are
     this entry&rsquo;s own claims, not make.fun&rsquo;s. Nothing here is investment advice, and no farm step
-    promises eligibility or a reward.
+    promises eligibility or a reward. The farm plans are scenarios to check, not instructions to transact.
   </footer>
 </main>
 <script src="../data.js"></script>

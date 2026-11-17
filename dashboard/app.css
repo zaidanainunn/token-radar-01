@@ -70,7 +70,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 20px 24px 40px; }
 .vtable td.num, .vtable th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vtable tbody tr { cursor: default; }
 .vtable tbody tr:hover { background: inherit; }
-.badge.lowconf { background: #fdecea; color: #8a2a22; }
+.badge.sparse { background: #fdecea; color: #8a2a22; }
 .conf-note { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0 0 14px; font-size: 14px; }
 .fine { color: var(--muted); font-size: 13px; }
 .hint { color: var(--muted); margin: 0 0 12px; font-size: 14px; }

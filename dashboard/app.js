@@ -1,7 +1,10 @@
 // Token Radar dashboard: renders window.RADAR (written by main.ts from the sealed snapshot).
 // No fetch, no network. Search, filter and sort run here, in the page. The farm plan is generated
 // here from the row's own record, by the same rules as lib/model.ts farmSteps: capital from TVL,
-// hold from age, the action from the category — never from a hand-written list of names.
+// hold from age, the action from the category — never from a hand-written list of names. Steps
+// that depend on something the snapshot does not show are conditional, costs are assumed budgets,
+// and nothing promises eligibility or a reward. This file must produce byte-identical steps to
+// lib/model.ts farmSteps for the same row.
 (function () {
   'use strict';
   var R = window.RADAR;
@@ -82,14 +85,16 @@
     var capital = capitalFor(row.tvl_usd);
     var hold = holdDaysFor(row.age_days);
     var gas = capital >= 150 ? 8 : 4;
+    var action = actionFor(row, capital, chain);
+    var actionLower = action.charAt(0).toLowerCase() + action.slice(1);
     var steps = [
-      { text: 'Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', cost: 'under $3 of gas for the first transaction', time: '5 minutes' },
-      { text: actionFor(row, capital, chain), cost: '$' + capital + ' of capital and about $' + gas + ' of gas', time: '15 minutes to set up' },
-      { text: 'Make one qualifying action each week, such as a deposit, a borrow, a swap or a vote.', cost: 'about $2 of gas a week', time: '10 minutes a week' },
-      { text: 'Hold the position for at least ' + hold + ' days so the activity is counted in more than one snapshot.', cost: 'the $' + capital + ' stays in the position', time: hold + ' days' },
-      { text: 'Before you withdraw, check whether the protocol publishes a points or rewards page, and claim only from a link it publishes.', cost: 'no fee to check, and never pay to claim', time: '10 minutes' },
+      { text: 'Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', cost: 'assumed budget under $3 of gas for the first transaction (not a verified fee)', time: '5 minutes' },
+      { text: 'First verify on ' + row.name + '\'s official interface that it supports this action on ' + chain + ' — the snapshot does not confirm the interface, the asset, the network or any minimum. If it does, ' + actionLower, cost: '$' + capital + ' of capital (assumed budget) and about $' + gas + ' of gas (assumed, not verified)', time: '15 minutes to set up' },
+      { text: 'If the protocol runs a rewards or points program — check its official pages first, because the snapshot does not say it does — consider one small action a week, such as a deposit, a borrow, a swap or a vote. There is no snapshot evidence that weekly actions change eligibility.', cost: 'assumed budget about $2 of gas a week (not a verified fee)', time: '10 minutes a week' },
+      { text: 'Hold the position for at least ' + hold + ' days as a long-hold scenario. The snapshot does not prove a longer hold changes eligibility, and age is not proof of a qualifying duration — treat this as an untested assumption.', cost: 'the $' + capital + ' stays in the position', time: hold + ' days' },
+      { text: 'Before you withdraw, check whether the protocol publishes a points or rewards page, and claim only from a link it publishes. Claiming itself may cost network gas; the snapshot carries no fee figures.', cost: 'no fee to check; claiming may cost gas (amount unverified)', time: '10 minutes' },
       { text: 'Write the wallet, the dates and every transaction in a farm log so you can repeat the position or unwind it.', cost: 'nothing but the log', time: '5 minutes' },
-      { text: 'Assumptions behind this plan: $' + capital + ' of capital, about $' + gas + ' of gas to enter, a ' + hold + '-day hold, on a protocol with $' + Math.round(row.tvl_usd / 1e6) + 'M of TVL. These are estimates from typical costs, not verified fees, and nothing here promises eligibility, a points program or a reward.', cost: 'no extra cost', time: 'read this before you start' }
+      { text: 'Assumptions behind this plan: $' + capital + ' of capital (an assumed budget, not a minimum the protocol requires — TVL does not prove a minimum), about $' + gas + ' of gas to enter (assumed, not verified), a ' + hold + '-day hold (a scenario, not a proven qualifying duration — age does not prove one), on a protocol with $' + Math.round(row.tvl_usd / 1e6) + 'M of TVL. These are estimates from typical costs, not verified fees, and nothing here promises eligibility, a points program or a reward. This entry never executes transactions; every step is a scenario to check, not an instruction to transact.', cost: 'no extra cost', time: 'read this before you start' }
     ];
     return steps.map(function (s) {
       var t = s.text + ' Cost: ' + s.cost + '. Time: ' + s.time + '.';
@@ -151,7 +156,7 @@
         '<td class="num rank">' + r.rank + '</td>' +
         '<td><span class="pname">' + esc(r.name) + '</span><br><span class="slug">' + esc(r.slug) + '</span>' +
         (r.watchlist ? '<span class="badge">WATCHLIST</span>' : '') +
-        (r.low_confidence ? '<span class="badge lowconf">LOW CONFIDENCE</span>' : '') + '</td>' +
+        (r.sparse_support ? '<span class="badge sparse">SPARSE SUPPORT</span>' : '') + '</td>' +
         '<td class="wrap">' + esc(r.category || '—') + '</td>' +
         '<td class="wrap">' + esc((r.chains || []).slice(0, 2).join(', ') || '—') + '</td>' +
         '<td class="num">' + money(r.tvl_usd) + '</td>' +
@@ -181,7 +186,7 @@
       '<div><div class="k">TVL</div><div class="v">' + money(r.tvl_usd) + '</div><div class="s">sealed snapshot</div></div>' +
       '<div><div class="k">Multiple</div><div class="v">&times;' + r.multiple.toFixed(2) + '</div><div class="s">size-fitted, TVL ' + money(r.tvl_usd) + '</div></div>' +
       '<div><div class="k">7-day growth</div><div class="v">' + (r.change_7d === null ? 'n/a' : (r.change_7d > 0 ? '+' : '') + r.change_7d.toFixed(1) + '%') + '</div><div class="s">clamped to ' + growth.toFixed(1) + '%</div></div>' +
-      '<div><div class="k">Age</div><div class="v">' + ageText(r.age_days) + '</div><div class="s">' + (r.listed_at ? 'tracked since ' + r.listed_at : 'first seen unknown') + '</div></div>' +
+      '<div><div class="k">Age</div><div class="v">' + ageText(r.age_days) + '</div><div class="s">' + (r.listed_at ? 'tracked since ' + r.listed_at + ' — time tracked by DefiLlama, proxy only' : 'first seen unknown — age imputed as 365 days') + '</div></div>' +
       '</div>' +
       '<p class="why"><strong>Why rank #' + r.rank + ':</strong> ' + moneyFull(r.tvl_usd) + ' of TVL at a fitted ' +
       'multiple of &times;' + r.multiple.toFixed(2) + ' (small protocols trade at higher multiples of TVL than ' +
@@ -189,9 +194,9 @@
       'maturity multiplier of ' + r.maturity_multiplier.toFixed(2) + ' for ' + ageText(r.age_days) + ' with no token ' +
       'recorded, gives ' + moneyFull(r.implied_value_usd) + '. That is the board&rsquo;s own claim, a proxy — not a ' +
       'valuation, and not a prediction that a token will launch.</p>' +
-      '<p class="conf-note">' + (r.low_confidence
-        ? '<strong>Low confidence:</strong> this protocol&rsquo;s category has only ' + r.category_comps + ' launch-comparable comp' + (r.category_comps === 1 ? '' : 's') + ' (fewer than 4), so the fitted multiple is extrapolated here with no family-level check. Treat the implied value as a rough ordering signal, not a valuation.'
-        : '<strong>Confidence:</strong> this protocol&rsquo;s category has ' + r.category_comps + ' launch-comparable comps and was checked leave-one-family-out.') + '</p>' +
+      '<p class="conf-note">' + (r.sparse_support
+        ? '<strong>Sparse category support:</strong> this protocol&rsquo;s category has only ' + r.category_comps + ' launch-comparable comp' + (r.category_comps === 1 ? '' : 's') + ' (fewer than 4), so the fitted multiple is extrapolated here with no category-level check. Treat the implied value as a rough ordering signal, not a valuation. The tag is a count label, not a calibrated probability.'
+        : '<strong>Checked, not guaranteed:</strong> this protocol&rsquo;s category has ' + r.category_comps + ' launch-comparable comps and was checked leave-one-category-out. Four or more comps is not high confidence — the typical error across the board is still a factor of about 3.') + '</p>' +
       '<h3>Farm plan — 7 steps</h3>' +
       '<ol class="steps">' + steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>';
     detailWrap.hidden = false;
