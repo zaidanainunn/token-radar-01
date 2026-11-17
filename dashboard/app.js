@@ -94,7 +94,7 @@
       { text: 'Hold the position for at least ' + hold + ' days as a long-hold scenario. The snapshot does not prove a longer hold changes eligibility, and age is not proof of a qualifying duration — treat this as an untested assumption.', cost: 'the $' + capital + ' stays in the position', time: hold + ' days' },
       { text: 'Before you withdraw, check whether the protocol publishes a points or rewards page, and claim only from a link it publishes. Claiming itself may cost network gas; the snapshot carries no fee figures.', cost: 'no fee to check; claiming may cost gas (amount unverified)', time: '10 minutes' },
       { text: 'Write the wallet, the dates and every transaction in a farm log so you can repeat the position or unwind it.', cost: 'nothing but the log', time: '5 minutes' },
-      { text: 'Assumptions behind this plan: $' + capital + ' of capital (an assumed budget, not a minimum the protocol requires — TVL does not prove a minimum), about $' + gas + ' of gas to enter (assumed, not verified), a ' + hold + '-day hold (a scenario, not a proven qualifying duration — age does not prove one), on a protocol with $' + Math.round(row.tvl_usd / 1e6) + 'M of TVL. These are estimates from typical costs, not verified fees, and nothing here promises eligibility, a points program or a reward. This entry never executes transactions; every step is a scenario to check, not an instruction to transact.', cost: 'no extra cost', time: 'read this before you start' }
+      { text: 'Assumptions: $' + capital + ' of capital (assumed budget — TVL does not prove a minimum), about $' + gas + ' of gas to enter (assumed, not verified), a ' + hold + '-day hold (scenario — age does not prove a qualifying duration), on a protocol with $' + Math.round(row.tvl_usd / 1e6) + 'M of TVL. Nothing here promises eligibility, a points program or a reward. This entry never executes transactions; every step is a scenario to check, not an instruction to transact.', cost: 'no extra cost', time: 'read this before you start' }
     ];
     return steps.map(function (s) {
       var t = s.text + ' Cost: ' + s.cost + '. Time: ' + s.time + '.';
@@ -191,14 +191,16 @@
       '<p class="why"><strong>Why rank #' + r.rank + ':</strong> ' + moneyFull(r.tvl_usd) + ' of TVL at a fitted ' +
       'multiple of &times;' + r.multiple.toFixed(2) + ' (small protocols trade at higher multiples of TVL than ' +
       'large ones in this snapshot), times a growth multiplier of ' + r.growth_multiplier.toFixed(2) + ' and a ' +
-      'maturity multiplier of ' + r.maturity_multiplier.toFixed(2) + ' for ' + ageText(r.age_days) + ' with no token ' +
-      'recorded, gives ' + moneyFull(r.implied_value_usd) + '. That is the board&rsquo;s own claim, a proxy — not a ' +
+      'maturity multiplier of ' + r.maturity_multiplier.toFixed(2) + ' (' + ageText(r.age_days) + ' time tracked; ' +
+      'the current snapshot records no token; unknown age uses imputation) gives ' + moneyFull(r.implied_value_usd) +
+      '. That is the board&rsquo;s own claim, a proxy — not a ' +
       'valuation, and not a prediction that a token will launch.</p>' +
       '<p class="conf-note">' + (r.sparse_support
         ? '<strong>Sparse category support:</strong> this protocol&rsquo;s category has only ' + r.category_comps + ' launch-comparable comp' + (r.category_comps === 1 ? '' : 's') + ' (fewer than 4), so the fitted multiple is extrapolated here with no category-level check. Treat the implied value as a rough ordering signal, not a valuation. The tag is a count label, not a calibrated probability.'
         : '<strong>Checked, not guaranteed:</strong> this protocol&rsquo;s category has ' + r.category_comps + ' launch-comparable comps and was checked leave-one-category-out. Four or more comps is not high confidence — the typical error across the board is still a factor of about 3.') + '</p>' +
       '<h3>Farm plan — 7 steps</h3>' +
-      '<ol class="steps">' + steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>';
+      '<ol class="steps">' + steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
+      '<p class="fine">Notes: capital and gas are assumed budgets; the hold is an untested scenario; nothing here promises eligibility, a points program or a reward. This entry never executes transactions.</p>';
     detailWrap.hidden = false;
     document.getElementById('detail-close').addEventListener('click', function () {
       detailWrap.hidden = true;

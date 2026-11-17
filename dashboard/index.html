@@ -117,6 +117,9 @@
     <strong>1.51</strong>, 4.5&times;, 351%, 88% for the flat &times;0.25 house model.
     Leave-one-category-out (each category predicted from a fit on all other categories, n&nbsp;=&nbsp;59):
     <strong>1.13</strong>, 3.1&times;, 210%, 81% against 1.39, 4.0&times;, 302%, 81%.
+    On the median standard APE the full model does not lead: size-only&rsquo;s leave-one-out median is
+    83.59% against the full model&rsquo;s 86.28%, and leave-one-category-out is ~81% for all four variants
+    (full 81.09% against flat 81.09% — practically identical, the full model a hair worse).
     Per-category multiples were fitted and tested too, and <em>rejected</em>: leave-one-out
     1.60, worse than the flat multiple, because ratios inside a category still span orders of magnitude.
     The check tests generalisation across protocol categories on this one frozen snapshot — nothing more.
@@ -138,7 +141,11 @@
     candidates from the board, not versioned comps from the fit) and the sensitivity is reported: without
     Aave V2 the fit is intercept 9.2562, slope &minus;0.6130 on 93 comps, leave-one-out median |log error|
     1.1556 (was 1.1710), median factor error 218% (was 223%), median standard APE 85.05% (was 86.28%).
-    The fit is not driven by that one comp.</p>
+    Removing it and rescoring the same 178 rows moves every implied value down by 1.7&ndash;12.2%
+    (median 4.1%) and changes 81 of 178 ranks by at most 4 places, while the top 10 — and the top 5
+    in order — are unchanged. That is fit stability on the same candidate set; the slope and the two
+    LOO medians alone do not prove ranking stability, because they are measured on different samples
+    (94 vs 93 comps).</p>
     <h3>Ablation — each part earns its place on the median log error, not on every metric</h3>
     <table class="vtable">
       <thead><tr><th>Variant</th><th class="num">LOO median |log err|</th><th class="num">LOO median factor err</th><th class="num">LOO mean factor err</th><th class="num">LOCO median |log err|</th><th class="num">LOCO median factor err</th><th class="num">LOCO mean factor err</th></tr></thead>
@@ -159,11 +166,13 @@
       </tbody>
     </table>
     <p>Every added part improves the <em>median |log error|</em> and the <em>median factor error</em> at each
-    step. On standard APE the picture is flatter: the leave-one-out median standard APE is 83&ndash;88% for
-    every variant (best: size-only, 83.59%), and the leave-one-category-out median is ~81% for all four.
+    step — on those two measures only, and only as a descriptive tradeoff, never as statistical
+    significance and never as superiority on all metrics. On standard APE the picture is flatter: the
+    leave-one-out median standard APE is 83&ndash;88% for every variant (best: size-only, 83.59%; full:
+    86.28%), and the leave-one-category-out median is ~81% for all four (full 81.09% vs flat 81.09%).
     On standard APE means the full model wins leave-one-out (532% vs 819% flat) but loses
     leave-one-category-out to flat (689% vs 516%). The size fit&rsquo;s edge is a log-scale edge: it predicts
-    the typical protocol better, and it does not make the standard APE materially better. The mean factor
+    the typical protocol better on the log scale, and it does not make the standard APE materially better. The mean factor
     error tells a tail story: 22 of the 94 comps miss by more than 1,000%, and four miss by more than
     10,000% — rain&rsquo;s market cap is 400&times; its TVL, bitway-earn 36&times;, aave-v2 19&times;, while
     concentrator&rsquo;s is 0.13% of its TVL and obol&rsquo;s 0.06%. The fitted line cannot reach either tail, and
@@ -211,8 +220,13 @@
     <p><strong>Coverage — the whole universe, not just the ledger.</strong> The snapshot holds 758 protocols:
     342 record no token and 416 already trade one. Of the 342, the 40 watchlist protocols are all on the
     board (mandatory, all above the $50M floor); 92 more pre-token protocols sit above the floor but are not
-    on the watchlist and are excluded by the floor rule — they are <em>not</em> in the ledger; the remaining
-    210 below-floor pre-token candidates are the ledger&rsquo;s universe. The ledger
+    on the watchlist. This board covers the mandatory watchlist plus a below-floor extension only, so those
+    92 are omitted by the entry&rsquo;s selection policy, not by a floor rule — the input rules say a protocol
+    the list leaves out is no worse a subject. They are <em>not</em> in the ledger. Twenty of the 92 pass the
+    visible classification check, but the snapshot carries no parent linkage, so they cannot simply be added
+    (they may be parent-related) — a labelled blind spot, not a resolved one, and ledger parity does not
+    prove the 138 early rows are parent-product-free either. The remaining 210 below-floor pre-token
+    candidates are the ledger&rsquo;s universe. The ledger
     (<code>exclusion-ledger.csv</code>, 210 rows) lists those 210 with a status per row: 138 are on the board
     as early rows and <strong>72 are excluded</strong> by the classification rule (liquid-staking receipts,
     bridges, exchanges, versioned pools, and names carrying wrapped or staked) — so the ledger is 210 rows,

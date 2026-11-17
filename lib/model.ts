@@ -241,8 +241,10 @@ export interface ValidationCheck {
    * means the typical prediction is about 3.1 times too big or too small. */
   median_factor: number;
   /** The same, as a median factor error in per cent (pooled): the median, over the held-out
-   * predictions, of (exp(|log error|) − 1) × 100. Note this is NOT (median_factor − 1) × 100:
-   * the median of the per-prediction factor errors differs from the factor error of the median. */
+   * predictions, of (exp(|log error|) − 1) × 100. That equals (median_factor − 1) × 100
+   * before rounding: (f − 1) × 100 is increasing affine in f, so it commutes with the
+   * sample median (including even samples). What does NOT commute is exp(median |log error|)
+   * against the median of exp(|log error|) — see median_factor above. */
   median_factor_error_pct: number;
   /** The mean factor error (pooled): the average miss, not just the middle one. */
   mean_factor_error_pct: number;
@@ -309,6 +311,10 @@ export interface ModelFit {
   /** The versioned-comp sensitivity: the fit and its leave-one-out check with and without the
    * comps whose names carry a version marker (see versionedSensitivity). */
   versioned_comp_sensitivity: VersionedCompSensitivity;
+  /** The versioned-comp ranking check: the board's rows rescored with the without-versioned
+   * fit, on the same candidate set (see rankingStability). Descriptive fit stability, not a
+   * ranking-stability proof on its own — the numbers are the check itself. */
+  versioned_ranking_stability: RankingStability;
 }
 
 /** The fit and its leave-one-out check, with and without the versioned-name comps. */
@@ -321,6 +327,25 @@ export interface VersionedCompSensitivity {
   with_versioned: { intercept: number; slope: number; n_comps: number; loo_median_log_error: number; loo_median_factor_error_pct: number; loo_median_std_ape_pct: number };
   /** The same, with the versioned-name comps removed from the pool before fitting. */
   without_versioned: { intercept: number; slope: number; n_comps: number; loo_median_log_error: number; loo_median_factor_error_pct: number; loo_median_std_ape_pct: number };
+}
+
+/** The versioned-comp ranking check: the board's rows rescored with the without-versioned
+ * fit, on the SAME candidate set. The two fits are compared on the same rows, so the moves
+ * below are ranking moves, not sample changes. Descriptive fit stability, not a
+ * ranking-stability proof on its own — the numbers are the check itself. */
+export interface RankingStability {
+  /** Most negative implied-value move, in per cent, across the board's rows. */
+  implied_pct_shift_min: number;
+  /** Least negative implied-value move, in per cent, across the board's rows. */
+  implied_pct_shift_max: number;
+  /** Median implied-value move, in per cent. */
+  implied_pct_shift_median: number;
+  /** Rows whose rank changes when the without-versioned fit scores the same candidates. */
+  rank_changes: number;
+  /** Largest rank move, in places. */
+  max_rank_move: number;
+  /** Rows in the top 10 under both fits. */
+  top10_overlap: number;
 }
 
 /** Everything the dashboard needs: the board, the live set, and the model it runs. */
@@ -640,6 +665,50 @@ export function versionedSensitivity(
   };
 }
 
+/**
+ * The versioned-comp ranking check: the board's rows rescored with the without-versioned
+ * fit, on the SAME candidate set — so the moves below are ranking moves, not sample
+ * changes. Slope alone (−0.5951 vs −0.6130) and the two LOO medians (1.1710 on 94 comps vs
+ * 1.1556 on 93) do not prove ranking stability, because they are measured on different
+ * samples; this check scores the same 178 rows twice and reports what actually moves.
+ */
+export function rankingStability(
+  snapshot: Snapshot,
+  board: BoardRow[],
+  model: ModelConstants = MODEL,
+): RankingStability {
+  const comps = compsOf(snapshot);
+  const fitWith = fitMultiple(comps);
+  const fitWithout = fitMultiple(comps.filter((p) => !VERSIONED.test(p.name)));
+  const bySlug = new Map(snapshot.protocols.map((p) => [p.slug, p]));
+  const scored = board.map((r) => {
+    const p = bySlug.get(r.slug)!;
+    const withV = impliedValue(p, snapshot.as_of, fitWith, model).implied;
+    const withoutV = impliedValue(p, snapshot.as_of, fitWithout, model).implied;
+    return { slug: r.slug, rankWith: r.rank, impliedWith: withV, impliedWithout: withoutV };
+  });
+  const shifts = scored.map((s) => (s.impliedWithout / s.impliedWith - 1) * 100);
+  const rankedWithout = [...scored].sort((a, b) => b.impliedWithout - a.impliedWithout || (a.slug < b.slug ? -1 : 1));
+  const rankWithout = new Map(rankedWithout.map((s, i) => [s.slug, i + 1]));
+  let rankChanges = 0;
+  let maxMove = 0;
+  let top10Overlap = 0;
+  for (const s of scored) {
+    const rw = rankWithout.get(s.slug)!;
+    if (rw !== s.rankWith) rankChanges++;
+    maxMove = Math.max(maxMove, Math.abs(rw - s.rankWith));
+    if (s.rankWith <= 10 && rw <= 10) top10Overlap++;
+  }
+  return {
+    implied_pct_shift_min: round4(Math.min(...shifts)),
+    implied_pct_shift_max: round4(Math.max(...shifts)),
+    implied_pct_shift_median: round4(median(shifts)),
+    rank_changes: rankChanges,
+    max_rank_move: maxMove,
+    top10_overlap: top10Overlap,
+  };
+}
+
 export function validateFit(
   snapshot: Snapshot,
   model: ModelConstants = MODEL,
@@ -898,7 +967,7 @@ export function farmSteps(p: SnapshotProtocol, age: number | null, tvlUsd: numbe
       time: '5 minutes',
     },
     {
-      text: `Assumptions behind this plan: $${capital} of capital (an assumed budget, not a minimum the protocol requires — TVL does not prove a minimum), about $${gas} of gas to enter (assumed, not verified), a ${hold}-day hold (a scenario, not a proven qualifying duration — age does not prove one), on a protocol with $${Math.round(tvlUsd / 1_000_000)}M of TVL. These are estimates from typical costs, not verified fees, and nothing here promises eligibility, a points program or a reward. This entry never executes transactions; every step is a scenario to check, not an instruction to transact.`,
+      text: `Assumptions: $${capital} of capital (assumed budget — TVL does not prove a minimum), about $${gas} of gas to enter (assumed, not verified), a ${hold}-day hold (scenario — age does not prove a qualifying duration), on a protocol with $${Math.round(tvlUsd / 1_000_000)}M of TVL. Nothing here promises eligibility, a points program or a reward. This entry never executes transactions; every step is a scenario to check, not an instruction to transact.`,
       cost: 'no extra cost',
       time: 'read this before you start',
     },
@@ -1008,6 +1077,7 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
       leave_one_category_out: validation.leave_one_category_out,
       ablation: validation.ablation,
       versioned_comp_sensitivity: versionedSensitivity(snapshot, model),
+      versioned_ranking_stability: rankingStability(snapshot, board, model),
     },
     watchlist_size: snapshot.watchlist.length,
     board_size: board.length,
