@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Radar — pre-token protocols ranked by implied launch value</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-inner">
+    <div>
+      <h1>TOKEN RADAR</h1>
+      <p class="tagline">Every protocol that still records no token, ranked by what its launch would be worth.</p>
+    </div>
+    <div class="masthead-meta">
+      <span id="as-of">Snapshot 2026-11-14</span>
+      <span id="coverage">178 ranked &middot; 40 watchlist + 138 early</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="card summary" id="summary">
+    <h2>What this number means — read before trusting it</h2>
+    <p><strong>Implied value</strong> is this board&rsquo;s own claim about what a protocol&rsquo;s launch would
+    be worth <em>if its record stayed as it is</em>: <strong>implied = 8085 &times; TVL<sup>0.4049</sup>
+    &times; growth &times; maturity</strong>. The 8085 and 0.4049 come from least squares on the
+    <strong>94</strong> launch-comparable live-token protocols in this one frozen snapshot (DefiLlama,
+    2026-11-14) — not from a rule anyone chose.</p>
+    <p class="warn"><strong>PROXY — read this as order-of-magnitude, not a price.</strong> The typical error
+    is <strong>~210%</strong> (leave-one-family-out median); the mean error is in the thousands of per cent
+    because a few protocols trade at 19&times;&ndash;400&times; their TVL or under 1% of it. It is not a
+    valuation, not an FDV, and not a forecast of whether or when a token launches or what it would trade at.</p>
+    <p><strong>Confidence is labelled per row.</strong> 79 of 178 rows sit in categories checked
+    leave-one-family-out; the other <strong>99 carry a LOW CONFIDENCE tag</strong> — fewer than 4
+    launch-comparable comps in their category, so the fitted multiple is extrapolated with no family-level
+    check. All 33 Risk Curators are tagged: their category has a single comp.</p>
+  </section>
+
+  <section class="card controls" id="controls">
+    <label>Search <input id="q" type="search" placeholder="protocol name or slug" autocomplete="off"></label>
+    <label>Category
+      <select id="cat"><option value="">All categories</option></select>
+    </label>
+    <label>Scope
+      <select id="scope">
+        <option value="all">All 178 rows</option>
+        <option value="watchlist">Watchlist only (40)</option>
+        <option value="early">Early rows only (138)</option>
+      </select>
+    </label>
+    <label>Sort by
+      <select id="sort">
+        <option value="implied">Implied value (high first)</option>
+        <option value="tvl">TVL (high first)</option>
+        <option value="growth">7-day growth (high first)</option>
+        <option value="age">Age (oldest first)</option>
+        <option value="name">Name (A–Z)</option>
+      </select>
+    </label>
+    <span class="count" id="count"></span>
+  </section>
+
+  <section class="card" id="detail-wrap" hidden>
+    <div id="detail"></div>
+  </section>
+
+  <section class="card">
+    <h2 id="board-title">The board</h2>
+    <p class="hint">Click any row for its detail view: why this rank, the model&rsquo;s arithmetic, and its farm plan.</p>
+    <div class="table-wrap">
+      <table id="board">
+        <thead><tr>
+          <th class="num">#</th><th>Protocol</th><th>Category</th><th>Chains</th>
+          <th class="num">TVL</th><th class="num">7d</th><th class="num">Age</th>
+          <th class="num">Multiple</th><th class="num">Implied value</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card method" id="method">
+    <h2>How the ranking works — read this first</h2>
+    <p><strong>Implied value = TVL &times; multiple(TVL) &times; growth &times; maturity.</strong>
+    The multiple is <em>fitted from this snapshot</em>, not asserted:
+    log(market&nbsp;cap&nbsp;/&nbsp;TVL) = 8.9978 &minus; 0.5951 &times; log(TVL), fitted by least squares on the
+    94 launch-comparable live-token protocols in the snapshot (bridges, liquid-staking receipts and
+    exchange tokens excluded — their TVL is not a launch). The multiple is clamped to 0.01&ndash;3.0, so
+    a $5M protocol gets &times;0.83, a $50M one &times;0.21, a $500M one &times;0.05 and a $5B one &times;0.01.
+    Growth is the 7-day TVL change clamped to &minus;60…+120% (weight 0.5); maturity is 0.6 + up to 0.4
+    for age up to 1,095 days (unknown age counts as 365). The same function scores every row; no
+    protocol name is ever special-cased.</p>
+    <p><strong>The formula in power-law form.</strong> exp(8.9978) = 8085, so before the clamp the model is
+    implied = 8085 &times; TVL<sup>0.4049</sup> &times; growth &times; maturity, with TVL in whole US dollars.
+    The fit&rsquo;s target is log(mcap_usd&nbsp;/&nbsp;TVL_usd) regressed on log(TVL_usd); a comp enters only with
+    mcap&nbsp;&gt;&nbsp;0, TVL&nbsp;&gt;&nbsp;0 and a recorded category, and a missing 7-day change counts as 0% while a
+    missing listing date counts as 365 days of age. The coefficients come from least squares on the snapshot,
+    not from a rule anyone chose; the fit&rsquo;s centre is geometric (no smearing correction), which is why the
+    errors below are reported on the log scale and as percentages. The clamp never binds on this board: it
+    would bind below $581K and above $8.4B, while the board spans $5.0M&ndash;$2.75B and the comps span
+    $5.0M&ndash;$10.2B — the fit interpolates, it does not extrapolate past the protocols it learned from.</p>
+    <p><strong>The multiple is a PROXY.</strong> A circulating market cap is not a protocol valuation and
+    not an FDV, and an implied value is this board&rsquo;s own claim about what a launch would be worth
+    if the protocol&rsquo;s record stayed as it is. It does not predict whether or when a token is issued,
+    or what it would trade at afterwards.</p>
+    <p><strong>Checked, not just fitted.</strong> Leave-one-out on the 94 comps (each protocol predicted
+    from a fit on the other 93, refit per fold — the held-out protocol never enters its own fit):
+    median |log error| <strong>1.17</strong> (median error 223%) against
+    <strong>1.51</strong> (351%) for the flat &times;0.25 house model. Leave-one-family-out (each category
+    predicted from a fit on all other categories, n&nbsp;=&nbsp;59): <strong>1.13</strong> (210%) against
+    1.39 (302%). Per-category multiples were fitted and tested too, and <em>rejected</em>: leave-one-out
+    1.60, worse than the flat multiple, because ratios inside a category still span orders of magnitude.
+    The check tests generalisation across protocol families on this one frozen snapshot — nothing more.</p>
+    <h3>Ablation — each part earns its place on the median, not on the mean</h3>
+    <table class="vtable">
+      <thead><tr><th>Variant</th><th class="num">LOO median |log err|</th><th class="num">LOO median APE</th><th class="num">LOO mean APE</th><th class="num">LOFO median |log err|</th><th class="num">LOFO median APE</th><th class="num">LOFO mean APE</th></tr></thead>
+      <tbody>
+        <tr><td>flat &times;0.25 (radar-1, house model)</td><td class="num">1.5065</td><td class="num">351%</td><td class="num">4,351%</td><td class="num">1.3913</td><td class="num">302%</td><td class="num">1,279%</td></tr>
+        <tr><td>size-only</td><td class="num">1.2946</td><td class="num">265%</td><td class="num">1,822%</td><td class="num">1.2982</td><td class="num">266%</td><td class="num">1,391%</td></tr>
+        <tr><td>size + growth</td><td class="num">1.2311</td><td class="num">243%</td><td class="num">1,971%</td><td class="num">1.2782</td><td class="num">259%</td><td class="num">1,374%</td></tr>
+        <tr><td><strong>full (radar-2, this board)</strong></td><td class="num"><strong>1.1710</strong></td><td class="num"><strong>223%</strong></td><td class="num"><strong>2,352%</strong></td><td class="num"><strong>1.1316</strong></td><td class="num"><strong>210%</strong></td><td class="num"><strong>1,505%</strong></td></tr>
+      </tbody>
+    </table>
+    <p>Every added part improves the <em>median</em> — the typical protocol is predicted better at each step.
+    The <em>mean</em> APE tells a different story and is reported as-is: it stays in the thousands of per cent
+    for every variant, and on leave-one-family-out the full model&rsquo;s mean (1,505%) is worse than the flat
+    model&rsquo;s (1,279%) even as its median is better. The mean is a tail story: 22 of the 94 comps miss by
+    more than 1,000%, and four miss by more than 10,000% — rain&rsquo;s market cap is 400&times; its TVL,
+    bitway-earn 36&times;, aave-v2 19&times;, while concentrator&rsquo;s is 0.13% of its TVL and obol&rsquo;s 0.06%.
+    The fitted line cannot reach either tail, and no variant tested does. The median is the representative
+    number; the mean is kept here so the tails are not hidden.</p>
+    <p><strong>Pooled vs macro.</strong> The pooled numbers above weight every prediction equally, so the big
+    families dominate. A macro average weights every family equally instead: leave-one-out macro median
+    1.59 (macro mean APE 4,608%) against pooled 1.17 (2,352%); leave-one-family-out macro median 1.12
+    (macro mean APE 1,310%) against pooled 1.13 (1,505%). The macro is worse on leave-one-out because the
+    small families (one to three comps) have the largest errors and count as much as the big ones.</p>
+    <h3>Leave-one-family-out, per family</h3>
+    <table class="vtable">
+      <thead><tr><th>Family</th><th class="num">Comps</th><th class="num">radar-2 median |log err|</th><th class="num">radar-1 median |log err|</th><th class="num">radar-2 mean APE</th><th class="num">radar-1 mean APE</th><th>Median verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Basis Trading</td><td class="num">7</td><td class="num">0.8277</td><td class="num">1.4463</td><td class="num">3,267%</td><td class="num">3,198%</td><td>wins</td></tr>
+        <tr><td>Cross Chain Bridge</td><td class="num">4</td><td class="num">1.3917</td><td class="num">1.2859</td><td class="num">357%</td><td class="num">710%</td><td>loses</td></tr>
+        <tr><td>Dexs</td><td class="num">11</td><td class="num">1.3981</td><td class="num">1.7553</td><td class="num">711%</td><td class="num">616%</td><td>wins</td></tr>
+        <tr><td>Lending</td><td class="num">15</td><td class="num">1.7863</td><td class="num">1.7562</td><td class="num">2,468%</td><td class="num">1,396%</td><td>loses</td></tr>
+        <tr><td>RWA</td><td class="num">9</td><td class="num">0.6563</td><td class="num">0.7055</td><td class="num">106%</td><td class="num">174%</td><td>wins</td></tr>
+        <tr><td>Yield</td><td class="num">9</td><td class="num">1.3023</td><td class="num">1.3913</td><td class="num">1,942%</td><td class="num">2,222%</td><td>wins</td></tr>
+        <tr><td>Yield Aggregator</td><td class="num">4</td><td class="num">0.5034</td><td class="num">1.1299</td><td class="num">316%</td><td class="num">233%</td><td>wins</td></tr>
+      </tbody>
+    </table>
+    <p>The size fit wins 5 of 7 families on the median and loses 2 — Cross Chain Bridge (n&nbsp;=&nbsp;4,
+    1.39 vs 1.29) and Lending (n&nbsp;=&nbsp;15, 1.79 vs 1.76), both narrow losses. The mean APE disagrees with
+    the median in two families (Basis Trading and Dexs win the median but lose the mean), because a single
+    extreme comp in a family dominates its mean. Only families with 4 or more comps are tabled: below that,
+    a family-level check has too few points to mean anything, and rows in those categories carry the
+    LOW CONFIDENCE tag instead.</p>
+    <h3>Risk Curators — the board&rsquo;s largest category, and its least checked</h3>
+    <p>33 rows are Risk Curators (12 watchlist + 21 early) — the board&rsquo;s largest category — and their
+    category has exactly <strong>one</strong> launch-comparable comp, so no family-level check exists for
+    them. Every curator row carries a LOW CONFIDENCE tag. Their TVL is the vaults they manage; the sealed
+    snapshot has no <code>parentProtocol</code> field and no vault linkage, so the board cannot tell whether
+    a curator&rsquo;s TVL and its vaults&rsquo; TVL count the same assets twice. The smoke test the snapshot does
+    allow: no two board rows share an exact TVL, and 7 groups of rows share a first name word (15 rows,
+    for example a curator and its vaults) — reported, not resolved. Curator farm plans describe a deposit
+    into a vault the curator manages, not an interaction with the curator and not eligibility for any
+    curator token.</p>
+    <p><strong>Coverage — the whole universe, not just the ledger.</strong> The snapshot holds 758 protocols:
+    342 record no token and 416 already trade one. Of the 342, the 40 watchlist protocols are all on the
+    board (mandatory, all above the $50M floor); 92 more pre-token protocols sit above the floor but are not
+    on the watchlist and are excluded by the floor rule — they are <em>not</em> in the ledger; the remaining
+    210 below-floor pre-token candidates are the ledger&rsquo;s universe. The ledger
+    (<code>exclusion-ledger.csv</code>, 210 rows) lists those 210 with a status per row: 138 are on the board
+    as early rows and <strong>72 are excluded</strong> by the classification rule (liquid-staking receipts,
+    bridges, exchanges, versioned pools, and names carrying wrapped or staked) — so the ledger is 210 rows,
+    not 210 exclusions. The 416 live-token protocols are all set aside (they have tokens, so they are not
+    candidates); the Live view below shows the top 24 by market cap. The board is 178 rows: 40 watchlist +
+    138 early. Say a protocol <em>records no token</em>, never that it has none: DefiLlama&rsquo;s record is
+    not proof. The watchlist is a floor, never a ceiling.</p>
+    <p class="fine">Source: DefiLlama https://api.llama.fi/protocols, fetched 2026-11-14. Model radar-2.
+    Farm plans state their assumptions in their last step; costs are estimates from typical gas, not
+    verified fees, and nothing here promises eligibility, a points program or a reward.</p>
+  </section>
+
+  <section class="card">
+    <h2>Live tokens — the market&rsquo;s own values</h2>
+    <p class="hint">These protocols already trade, so the board shows their market cap, not a model&rsquo;s
+    number. They are never mixed into the ranked board. The 94 launch-comparable ones among them are
+    the comps the multiple was fitted on.</p>
+    <div class="table-wrap">
+      <table id="live">
+        <thead><tr>
+          <th>Protocol</th><th>Category</th><th class="num">TVL</th>
+          <th class="num">Market cap</th><th class="num">mcap / TVL</th><th class="num">7d</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="fine">
+    Token Radar, model radar-2. Data: DefiLlama snapshot 2026-11-14, read-only. Implied values are
+    this entry&rsquo;s own claims, not make.fun&rsquo;s. Nothing here is investment advice, and no farm step
+    promises eligibility or a reward.
+  </footer>
+</main>
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
